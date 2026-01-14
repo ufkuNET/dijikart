@@ -1,3 +1,9 @@
+require("dotenv").config();
+
+console.log("BOOT OK");
+console.log("PORT:", process.env.PORT);
+console.log("NODE_ENV:", process.env.NODE_ENV);
+
 const express = require("express");
 const dotenv = require("dotenv");
 const path = require("path");
