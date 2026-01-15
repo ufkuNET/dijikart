@@ -1,43 +1,69 @@
-const crypto = require('crypto');
+const crypto = require("crypto");
 
 // CSRF token oluştur
-const generateCSRFToken = () => {
-  return crypto.randomBytes(32).toString('hex');
-};
+const generateCSRFToken = () => crypto.randomBytes(32).toString("hex");
 
-// CSRF token middleware
+// CSRF koruma middleware
+// - Session varsa token üretir/saklar
+// - POST/PUT/DELETE'de token kontrol eder
 const csrfProtection = (req, res, next) => {
-  // Token oluştur veya mevcut token'ı al
-  if (!req.session.csrfToken) {
-    req.session.csrfToken = generateCSRFToken();
-  }
-  
-  // Token'ı response'a ekle
-  res.locals.csrfToken = req.session.csrfToken;
-  
-  // POST, PUT, DELETE isteklerinde token kontrolü
-  if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
-    const token = req.body._csrf || req.headers['x-csrf-token'];
-    
-    if (!token || token !== req.session.csrfToken) {
-      return res.status(403).json({
-        success: false,
-        message: 'CSRF token geçersiz'
-      });
+  try {
+    // Session yoksa daha anlaşılır hata ver (ve app'i çökertme)
+    if (!req.session) {
+      return res.status(500).send(
+        "CSRF middleware requires session. Make sure express-session is registered BEFORE csrf middleware."
+      );
     }
+
+    // Token oluştur veya mevcut token'ı al
+    if (!req.session.csrfToken) {
+      req.session.csrfToken = generateCSRFToken();
+    }
+
+    // Token'ı response'a ekle (template'lerde kullanmak için)
+    res.locals.csrfToken = req.session.csrfToken;
+
+    // POST, PUT, DELETE isteklerinde token kontrolü
+    if (["POST", "PUT", "DELETE"].includes(req.method)) {
+      const tokenFromBody = req.body && req.body._csrf;
+      const tokenFromHeader = req.headers["x-csrf-token"];
+      const token = tokenFromBody || tokenFromHeader;
+
+      if (!token || token !== req.session.csrfToken) {
+        return res.status(403).json({
+          success: false,
+          message: "CSRF token geçersiz",
+        });
+      }
+    }
+
+    next();
+  } catch (err) {
+    next(err);
   }
-  
-  next();
 };
 
-// CSRF token'ı form'a ekle
+// CSRF token'ı her requestte template'e koy
+// - Token yoksa üretir ve session'a da yazar (stabil olması için)
 const addCSRFToken = (req, res, next) => {
-  res.locals.csrfToken = req.session.csrfToken || generateCSRFToken();
-  next();
+  try {
+    if (req.session) {
+      if (!req.session.csrfToken) {
+        req.session.csrfToken = generateCSRFToken();
+      }
+      res.locals.csrfToken = req.session.csrfToken;
+    } else {
+      // Session yoksa yine de locals'a bir token koy (form render bozulmasın)
+      res.locals.csrfToken = generateCSRFToken();
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 };
 
 module.exports = {
   csrfProtection,
   addCSRFToken,
-  generateCSRFToken
-}; 
+  generateCSRFToken,
+};
