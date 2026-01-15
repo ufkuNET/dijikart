@@ -1,4 +1,5 @@
 const fs = require("fs");
+fs.writeFileSync("wrapper-ok.txt", "wrapper started\n");
 
 // Crash'leri dosyaya yaz
 process.on("uncaughtException", (err) => {
