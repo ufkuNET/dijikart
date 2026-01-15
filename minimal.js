@@ -1,29 +1,19 @@
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
-
 const app = express();
 
 app.get("/", (req, res) => res.send("MINIMAL OK"));
 
-app.get("/debug", (req, res) => {
-  const cwd = process.cwd();
-  let files = [];
+app.get("/try-server", (req, res) => {
   try {
-    files = fs.readdirSync(cwd).slice(0, 200);
+    delete require.cache[require.resolve("./server.js")];
+    require("./server.js");
+    res.send("server.js require OK (no immediate crash)");
   } catch (e) {
-    files = ["readdirSync error: " + String(e)];
+    res.status(500).send(
+      "server.js require FAILED:\n\n" +
+      (e && e.stack ? e.stack : String(e))
+    );
   }
-
-  res.json({
-    cwd,
-    node: process.version,
-    port: process.env.PORT,
-    hasServerJs: files.includes("server.js"),
-    hasBootWrapper: files.includes("boot-wrapper.js"),
-    hasWrapperOk: files.includes("wrapper-ok.txt"),
-    files
-  });
 });
 
 app.listen(process.env.PORT, () => {
