@@ -102,6 +102,25 @@ app.use(express.static('public'));
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end();
 });
+// ================= SESSION (CSRF için şart) =================
+app.use(session({
+  secret: process.env.SESSION_SECRET || "devsecret_change_me",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production"
+  }
+}));
+
+// ================= CSRF + CacheControl (SESSION'DAN SONRA) =================
+const csrfMiddleware = require("./middleware/csrf");
+app.use(csrfMiddleware.csrfProtection);
+app.use(csrfMiddleware.addCSRFToken);
+
+const cacheControl = require("./middleware/cacheControl");
+app.use(cacheControl.sessionBasedCache);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -157,13 +176,7 @@ if (process.env.NODE_ENV === 'production') {
   app.use(logger.access);
 }
 
-// CSRF middleware (opt-in, formlara token ekler ve POST/PUT/DELETE'yi doğrular)
-const { addCSRFToken } = require('./middleware/csrf');
-app.use(addCSRFToken);
 
-// Cache control middleware - Session'dan sonra
-const { sessionBasedCache } = require('./middleware/cacheControl');
-app.use(sessionBasedCache);
 
 // MySQL bağlantısı
 const sequelize = require('./config/database');
